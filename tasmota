@@ -1,0 +1,201 @@
+#!/usr/bin/env python3
+"""tasmota - Control Tasmota smart plugs via HTTP API.
+
+Usage:
+    tasmota <device> on|off|toggle|status|power
+    tasmota list
+    tasmota discover
+
+Device mapping is loaded from config/devices.yaml.
+"""
+
+import sys
+import json
+import urllib.request
+import urllib.error
+import yaml
+import os
+import socket
+
+# Default config path
+DEFAULT_CONFIG = os.path.expanduser("~/.config/tasmota/devices.yaml")
+
+
+def load_devices(config_path=None):
+    """Load device mapping from YAML config."""
+    path = config_path or DEFAULT_CONFIG
+    if not os.path.exists(path):
+        print(f"Config not found: {path}", file=sys.stderr)
+        print(f"Create it with: tasmota init", file=sys.stderr)
+        sys.exit(1)
+    with open(path) as f:
+        data = yaml.safe_load(f)
+    return data.get("devices", {})
+
+
+def get_device(devices, name):
+    """Resolve device by name or IP."""
+    if name in devices:
+        return name, devices[name]
+    # Try IP lookup
+    for dev_name, dev_info in devices.items():
+        if dev_info.get("ip") == name:
+            return dev_name, dev_info
+    print(f"Device '{name}' not found. Use 'tasmota list' to see devices.", file=sys.stderr)
+    sys.exit(1)
+
+
+def http_get(ip, path, timeout=10):
+    """Make HTTP GET request to Tasmota device."""
+    url = f"http://{ip}{path}"
+    req = urllib.request.Request(url)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode())
+    except urllib.error.URLError as e:
+        print(f"Error connecting to {ip}: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def cmd_on(devices, name):
+    """Turn device ON."""
+    dev_name, dev = get_device(devices, name)
+    relay = dev.get("relay", 1)
+    ip = dev["ip"]
+    result = http_get(ip, f"/cm?cmnd=Power{relay}=ON")
+    print(f"{dev_name} -> ON: {result}")
+
+
+def cmd_off(devices, name):
+    """Turn device OFF."""
+    dev_name, dev = get_device(devices, name)
+    relay = dev.get("relay", 1)
+    ip = dev["ip"]
+    result = http_get(ip, f"/cm?cmnd=Power{relay}=OFF")
+    print(f"{dev_name} -> OFF: {result}")
+
+
+def cmd_toggle(devices, name):
+    """Toggle device."""
+    dev_name, dev = get_device(devices, name)
+    relay = dev.get("relay", 1)
+    ip = dev["ip"]
+    # Get current status
+    status = http_get(ip, "/cm?cmnd=Status")
+    power = status.get("Status", {}).get("Power", "0")
+    new_state = "OFF" if power == "1" else "ON"
+    result = http_get(ip, f"/cm?cmnd=Power{relay}={new_state}")
+    print(f"{dev_name} -> {new_state}: {result}")
+
+
+def cmd_status(devices, name):
+    """Get device status."""
+    dev_name, dev = get_device(devices, name)
+    ip = dev["ip"]
+    result = http_get(ip, "/cm?cmnd=Status")
+    status = result.get("Status", {})
+    print(f"=== {dev_name} ({ip}) ===")
+    print(f"  Power: {status.get('Power', 'unknown')}")
+    print(f"  PowerOnState: {status.get('PowerOnState', 'unknown')}")
+    print(f"  Module: {status.get('Module', 'unknown')}")
+    print(f"  DeviceName: {status.get('DeviceName', 'unknown')}")
+    print(f"  FriendlyName: {status.get('FriendlyName', 'unknown')}")
+    print(f"  Topic: {status.get('Topic', 'unknown')}")
+
+
+def cmd_power(devices, name):
+    """Get power consumption data."""
+    dev_name, dev = get_device(devices, name)
+    ip = dev["ip"]
+    try:
+        result = http_get(ip, "/cm?cmnd=Energy")
+        energy = result.get("Energy", {})
+        print(f"=== {dev_name} Power ===")
+        print(f"  Power: {energy.get('Power', 'N/A')} W")
+        print(f"  Voltage: {energy.get('Voltage', 'N/A')} V")
+        print(f"  Current: {energy.get('Current', 'N/A')} A")
+        print(f"  Today: {energy.get('Today', 'N/A')} Wh")
+        print(f"  Yesterday: {energy.get('Yesterday', 'N/A')} Wh")
+        print(f"  Total: {energy.get('Total', 'N/A')} Wh")
+        print(f"  Factor: {energy.get('Factor', 'N/A')}")
+    except Exception:
+        print(f"{dev_name} does not report power data.", file=sys.stderr)
+
+
+def cmd_list(devices):
+    """List all devices."""
+    if not devices:
+        print("No devices configured.")
+        return
+    print(f"{'Name':<20} {'IP':<18} {'Relay':<8} {'Power Meter'}")
+    print("-" * 60)
+    for name, info in devices.items():
+        has_meter = "Yes" if info.get("has_power_meter") else "No"
+        print(f"{name:<20} {info['ip']:<18} {info.get('relay', 1):<8} {has_meter}")
+
+
+def cmd_discover():
+    """Discover Tasmota devices via UDP broadcast (Tasmota discovery)."""
+    # Tasmota uses UDP broadcast on port 1883 for discovery
+    # This is a simplified version - full discovery requires parsing JSON payloads
+    print("Tasmota discovery requires network scan or MQTT broker access.")
+    print("Use 'tasmota list' to see configured devices.")
+    print("Add devices to ~/.config/tasmota/devices.yaml")
+
+
+def cmd_init():
+    """Initialize config file."""
+    path = DEFAULT_CONFIG
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    sample = {
+        "devices": {
+            "example_plug": {
+                "ip": "192.168.88.XX",
+                "relay": 1,
+                "has_power_meter": True
+            }
+        }
+    }
+    with open(path, "w") as f:
+        yaml.dump(sample, f, default_flow_style=False)
+    print(f"Config created: {path}")
+    print("Edit it to add your devices.")
+
+
+def main():
+    if len(sys.argv) < 2:
+        print(__doc__)
+        sys.exit(1)
+
+    cmd = sys.argv[1].lower()
+
+    if cmd == "init":
+        cmd_init()
+        return
+
+    devices = load_devices()
+
+    if cmd == "list":
+        cmd_list(devices)
+    elif cmd == "discover":
+        cmd_discover()
+    elif cmd in ("on", "off", "toggle", "status", "power"):
+        if len(sys.argv) < 3:
+            print(f"Usage: tasmota {cmd} <device>", file=sys.stderr)
+            sys.exit(1)
+        name = sys.argv[2]
+        {
+            "on": cmd_on,
+            "off": cmd_off,
+            "toggle": cmd_toggle,
+            "status": cmd_status,
+            "power": cmd_power,
+        }[cmd](devices, name)
+    else:
+        print(f"Unknown command: {cmd}", file=sys.stderr)
+        print(__doc__)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
