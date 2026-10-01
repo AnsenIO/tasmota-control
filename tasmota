@@ -33,6 +33,14 @@ def load_devices(config_path=None):
     return data.get("devices", {})
 
 
+def save_devices(devices, config_path=None):
+    """Save device mapping to YAML config."""
+    path = config_path or DEFAULT_CONFIG
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        yaml.dump({"devices": devices}, f, default_flow_style=False)
+
+
 def get_device(devices, name):
     """Resolve device by name or IP."""
     if name in devices:
@@ -134,12 +142,53 @@ def cmd_list(devices):
         print(f"{name:<20} {info['ip']:<18} {info.get('relay', 1):<8} {has_meter}")
 
 
+def cmd_rename(devices, name, new_name):
+    """Rename a device on the Tasmota hardware and update local config."""
+    dev_name, dev = get_device(devices, name)
+    ip = dev["ip"]
+    result = http_get(ip, f"/cm?cmnd=DeviceName%20{new_name}")
+    print(f"{dev_name} -> DeviceName '{new_name}': {result}")
+    # Update local config
+    if dev_name in devices:
+        devices[dev_name]["name"] = new_name
+        save_devices(devices)
+        print(f"  Config updated: {dev_name} renamed to '{new_name}'")
+    else:
+        # Device found by IP — rename the key
+        for key in list(devices.keys()):
+            if devices[key].get("ip") == ip:
+                devices[new_name] = devices.pop(key)
+                devices[new_name]["name"] = new_name
+                save_devices(devices)
+                print(f"  Config updated: '{key}' renamed to '{new_name}'")
+                break
+
+
+def cmd_updateip(devices, name, new_ip):
+    """Update the IP address of a device in local config and on the device."""
+    dev_name, dev = get_device(devices, name)
+    old_ip = dev["ip"]
+    # First, update the device's IP setting on the hardware
+    result = http_get(old_ip, f"/cm?cmnd=IP1%20{new_ip}")
+    print(f"{dev_name} -> IP1 {new_ip}: {result}")
+    # Update local config
+    if dev_name in devices:
+        devices[dev_name]["ip"] = new_ip
+        save_devices(devices)
+        print(f"  Config updated: {dev_name} IP changed from {old_ip} to {new_ip}")
+    else:
+        # Device found by name — update IP
+        devices[dev_name]["ip"] = new_ip
+        save_devices(devices)
+        print(f"  Config updated: {dev_name} IP changed from {old_ip} to {new_ip}")
+
+
 def cmd_discover():
     """Discover Tasmota devices via UDP broadcast (Tasmota discovery)."""
     # Tasmota uses UDP broadcast on port 1883 for discovery
     # This is a simplified version - full discovery requires parsing JSON payloads
     print("Tasmota discovery requires network scan or MQTT broker access.")
-    print("Use 'tasmota list' to see configured devices.")
+    print("Use 'tasmota list' to see devices.")
     print("Add devices to ~/.config/tasmota/devices.yaml")
 
 
@@ -191,6 +240,16 @@ def main():
             "status": cmd_status,
             "power": cmd_power,
         }[cmd](devices, name)
+    elif cmd == "rename":
+        if len(sys.argv) < 4:
+            print("Usage: tasmota rename <device> <new_name>", file=sys.stderr)
+            sys.exit(1)
+        cmd_rename(devices, sys.argv[2], sys.argv[3])
+    elif cmd == "updateip":
+        if len(sys.argv) < 4:
+            print("Usage: tasmota updateip <device> <new_ip>", file=sys.stderr)
+            sys.exit(1)
+        cmd_updateip(devices, sys.argv[2], sys.argv[3])
     else:
         print(f"Unknown command: {cmd}", file=sys.stderr)
         print(__doc__)

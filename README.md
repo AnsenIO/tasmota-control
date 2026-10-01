@@ -52,6 +52,8 @@ devices:
 | `tasmota <device> toggle` | Toggle device state |
 | `tasmota <device> status` | Get device status |
 | `tasmota <device> power` | Get power consumption data |
+| `tasmota rename <device> <new_name>` | Rename device on hardware + update config |
+| `tasmota updateip <device> <new_ip>` | Change device IP on hardware + update config |
 | `tasmota list` | List all configured devices |
 | `tasmota discover` | Discover Tasmota devices on network |
 | `tasmota init` | Initialize config file |
