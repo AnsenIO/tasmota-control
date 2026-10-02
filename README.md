@@ -60,7 +60,7 @@ devices:
 
 ## Power Data
 
-For devices with energy metering (e.g., Sonoff POW), the `power` command reports:
+For devices with energy metering (e.g., Eightree 16A Plug), the `power` command reports:
 
 - **Power** (W) - Current power consumption
 - **Voltage** (V) - Line voltage
@@ -68,14 +68,34 @@ For devices with energy metering (e.g., Sonoff POW), the `power` command reports
 - **Today** (Wh) - Energy used today
 - **Yesterday** (Wh) - Energy used yesterday
 - **Total** (Wh) - Total energy counter
+- **Factor** (PF) - Power factor
+- **ApparentPower** (VA) - Apparent power
+- **ReactivePower** (VAR) - Reactive power
 
 ## Tasmota HTTP API
 
 The script uses Tasmota's built-in HTTP interface:
 
 - Power control: `http://<ip>/cm?cmnd=Power<relay>=<ON|OFF>`
+<<<<<<< HEAD
 - Status: `http://<ip>/cm?cmnd=Status`
 - Energy: `http://<ip>/cm?cmnd=status%208`
+=======
+- Status: `http://<ip>/cm?cmnd=status%208`
+- Status (abbreviated): `http://<ip>/cm?cmnd=status%201`
+
+## Testing
+
+**Tested exclusively on Eightree 16A Plugs (ET28) with Tasmota firmware.**
+
+All four devices verified:
+- temp1 (192.168.88.2) - Eightree 16A Plug
+- temp2 (192.168.88.3) - Eightree 16A Plug
+- rpi-kvm-gx10 (192.168.88.11) - Eightree RPI KVM
+- gx10 (192.168.88.10) - Eightree GX10
+
+No testing has been performed on other Tasmota device types (Sonoff, Shelly, etc.). Compatibility with other hardware may vary.
+>>>>>>> 952fdfa0a8f7a7a2ece60de954bcce61ec14ad5e
 
 ## Requirements
 
