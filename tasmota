@@ -132,16 +132,68 @@ def cmd_power(devices, name):
         print(f"{dev_name} does not report power data.", file=sys.stderr)
 
 
-def cmd_list(devices):
-    """List all devices."""
+def cmd_list(devices, verbose=False, quiet=False):
+    """List all devices with live status and energy data."""
     if not devices:
         print("No devices configured.")
         return
-    print(f"{'Name':<20} {'IP':<18} {'Relay':<8} {'Power Meter'}")
-    print("-" * 60)
-    for name, info in devices.items():
-        has_meter = "Yes" if info.get("has_power_meter") else "No"
-        print(f"{name:<20} {info['ip']:<18} {info.get('relay', 1):<8} {has_meter}")
+
+    # Gather live data for all devices
+    live_data = {}
+    for dev_name, dev_info in devices.items():
+        ip = dev_info["ip"]
+        try:
+            # Use status 0 to get everything in one call
+            result = http_get(ip, "/cm?cmnd=status%200")
+            status_sts = result.get("StatusSTS", {})
+            status_sns = result.get("StatusSNS", {})
+            energy = status_sns.get("ENERGY", {})
+            power_val = status_sts.get("POWER", "0")
+            relay_state = "ON" if power_val == "ON" else "OFF"
+            live_data[dev_name] = {
+                "status": relay_state,
+                "power": energy.get("Power", "N/A"),
+                "today": energy.get("Today", "N/A"),
+                "yesterday": energy.get("Yesterday", "N/A"),
+                "total": energy.get("Total", "N/A"),
+                "voltage": energy.get("Voltage", "N/A"),
+                "current": energy.get("Current", "N/A"),
+                "factor": energy.get("Factor", "N/A"),
+                "apparent_power": energy.get("ApparentPower", "N/A"),
+                "reactive_power": energy.get("ReactivePower", "N/A"),
+                "has_energy": bool(energy),
+            }
+        except Exception:
+            live_data[dev_name] = {
+                "status": "N/A",
+                "power": "N/A",
+                "today": "N/A",
+                "yesterday": "N/A",
+                "total": "N/A",
+                "voltage": "N/A",
+                "current": "N/A",
+                "factor": "N/A",
+                "apparent_power": "N/A",
+                "reactive_power": "N/A",
+                "has_energy": False,
+            }
+
+    if quiet:
+        for dev_name, info in devices.items():
+            ld = live_data[dev_name]
+            print(f"{dev_name} {info['ip']} {ld['status']} {ld['power']}")
+    elif verbose:
+        print(f"{'Name':<20} {'IP':<18} {'Status':<8} {'Power':<10} {'Today':<10} {'Yesterday':<10} {'Total':<10} {'Voltage':<10} {'Current':<10} {'Factor':<8}")
+        print("-" * 116)
+        for dev_name, info in devices.items():
+            ld = live_data[dev_name]
+            print(f"{dev_name:<20} {info['ip']:<18} {ld['status']:<8} {ld['power']:<10} {ld['today']:<10} {ld['yesterday']:<10} {ld['total']:<10} {ld['voltage']:<10} {ld['current']:<10} {ld['factor']:<8}")
+    else:
+        print(f"{'Name':<20} {'IP':<18} {'Status':<8} {'Power (W)':<12} {'Today (Wh)':<12} {'Total (Wh)':<12}")
+        print("-" * 78)
+        for dev_name, info in devices.items():
+            ld = live_data[dev_name]
+            print(f"{dev_name:<20} {info['ip']:<18} {ld['status']:<8} {ld['power']:<12} {ld['today']:<12} {ld['total']:<12}")
 
 
 def cmd_rename(devices, name, new_name):
@@ -227,7 +279,9 @@ def main():
     devices = load_devices()
 
     if cmd == "list":
-        cmd_list(devices)
+        verbose = "--full" in sys.argv
+        quiet = "--quiet" in sys.argv
+        cmd_list(devices, verbose=verbose, quiet=quiet)
     elif cmd == "discover":
         cmd_discover()
     elif cmd in ("on", "off", "toggle", "status", "power"):
