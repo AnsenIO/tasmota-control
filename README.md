@@ -40,7 +40,7 @@ devices:
   kitchen_fan:
     ip: 192.168.88.12
     relay: 1
-    has_power_meter: false
+    has_power_meter: true
 ```
 
 ## Commands
@@ -75,7 +75,7 @@ The script uses Tasmota's built-in HTTP interface:
 
 - Power control: `http://<ip>/cm?cmnd=Power<relay>=<ON|OFF>`
 - Status: `http://<ip>/cm?cmnd=Status`
-- Energy: `http://<ip>/cm?cmnd=Energy`
+- Energy: `http://<ip>/cm?cmnd=status%208`
 
 ## Requirements
 

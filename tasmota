@@ -116,8 +116,8 @@ def cmd_power(devices, name):
     dev_name, dev = get_device(devices, name)
     ip = dev["ip"]
     try:
-        result = http_get(ip, "/cm?cmnd=Energy")
-        energy = result.get("Energy", {})
+        result = http_get(ip, "/cm?cmnd=status%208")
+        energy = result.get("StatusSNS", {}).get("ENERGY", {})
         print(f"=== {dev_name} Power ===")
         print(f"  Power: {energy.get('Power', 'N/A')} W")
         print(f"  Voltage: {energy.get('Voltage', 'N/A')} V")
@@ -126,6 +126,8 @@ def cmd_power(devices, name):
         print(f"  Yesterday: {energy.get('Yesterday', 'N/A')} Wh")
         print(f"  Total: {energy.get('Total', 'N/A')} Wh")
         print(f"  Factor: {energy.get('Factor', 'N/A')}")
+        print(f"  ApparentPower: {energy.get('ApparentPower', 'N/A')} VA")
+        print(f"  ReactivePower: {energy.get('ReactivePower', 'N/A')} VAR")
     except Exception:
         print(f"{dev_name} does not report power data.", file=sys.stderr)
 
