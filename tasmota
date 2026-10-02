@@ -118,6 +118,9 @@ def cmd_power(devices, name):
     try:
         result = http_get(ip, "/cm?cmnd=status%208")
         energy = result.get("StatusSNS", {}).get("ENERGY", {})
+        if not energy:
+            print(f"{dev_name} does not report power data.", file=sys.stderr)
+            return
         print(f"=== {dev_name} Power ===")
         print(f"  Power: {energy.get('Power', 'N/A')} W")
         print(f"  Voltage: {energy.get('Voltage', 'N/A')} V")
@@ -132,16 +135,64 @@ def cmd_power(devices, name):
         print(f"{dev_name} does not report power data.", file=sys.stderr)
 
 
-def cmd_list(devices):
-    """List all devices."""
+def cmd_list(devices, verbose=False):
+    """List all devices with live status and energy data."""
     if not devices:
         print("No devices configured.")
         return
-    print(f"{'Name':<20} {'IP':<18} {'Relay':<8} {'Power Meter'}")
-    print("-" * 60)
-    for name, info in devices.items():
-        has_meter = "Yes" if info.get("has_power_meter") else "No"
-        print(f"{name:<20} {info['ip']:<18} {info.get('relay', 1):<8} {has_meter}")
+
+    if verbose:
+        header = f"{'Name':<15} {'IP':<15} {'Status':<8} {'Power':>8} {'Today':>8} {'Yesterday':>8} {'Total':>8} {'Voltage':>8} {'Current':>7}"
+        print(header)
+        print("-" * 95)
+        for name, info in devices.items():
+            ip = info["ip"]
+            status_val, power, today, yesterday, total, voltage, current = _get_live_data(name, ip)
+            print(f"{name:<15} {ip:<15} {status_val:<8} {power:>7}W {today:>7}Wh {yesterday:>7}Wh {total:>7}Wh {voltage:>6}V {current:>6}A")
+    else:
+        header = f"{'Name':<15} {'IP':<15} {'Status':<8} {'Power':>8} {'Today':>8} {'Yesterday':>8} {'Total':>8}"
+        print(header)
+        print("-" * 62)
+        for name, info in devices.items():
+            ip = info["ip"]
+            status_val, power, today, yesterday, total, voltage, current = _get_live_data(name, ip)
+            print(f"{name:<15} {ip:<15} {status_val:<8} {power:>7}W {today:>7}Wh {yesterday:>7}Wh {total:>7}Wh")
+
+
+def _get_live_data(name, ip):
+    """Query a device for live status and energy data.
+    Returns (status_str, power, today, yesterday, total, voltage, current).
+    """
+    try:
+        result = http_get(ip, "/cm?cmnd=status%208")
+        status = result.get("Status", {})
+        energy = result.get("StatusSNS", {}).get("ENERGY", {})
+        if not energy:
+            power_str = "N/A"
+            today = "N/A"
+            yesterday = "N/A"
+            total = "N/A"
+            voltage = "N/A"
+            current = "N/A"
+        else:
+            power_val = energy.get("Power", "N/A")
+            power_str = f"{power_val}" if power_val != "N/A" else "N/A"
+            today = energy.get("Today", "N/A")
+            yesterday = energy.get("Yesterday", "N/A")
+            total = energy.get("Total", "N/A")
+            voltage = energy.get("Voltage", "N/A")
+            current = energy.get("Current", "N/A")
+        power_val = status.get("Power", "0")
+        status_val = "ON" if power_val == "1" else "OFF"
+    except Exception:
+        status_val = "ERR"
+        power_str = "N/A"
+        today = "N/A"
+        yesterday = "N/A"
+        total = "N/A"
+        voltage = "N/A"
+        current = "N/A"
+    return status_val, power_str, today, yesterday, total, voltage, current
 
 
 def cmd_rename(devices, name, new_name):
@@ -227,7 +278,8 @@ def main():
     devices = load_devices()
 
     if cmd == "list":
-        cmd_list(devices)
+        verbose = "--verbose" in sys.argv or "-v" in sys.argv
+        cmd_list(devices, verbose=verbose)
     elif cmd == "discover":
         cmd_discover()
     elif cmd in ("on", "off", "toggle", "status", "power"):
