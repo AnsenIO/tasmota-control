@@ -77,10 +77,6 @@ For devices with energy metering (e.g., Eightree 16A Plug), the `power` command 
 The script uses Tasmota's built-in HTTP interface:
 
 - Power control: `http://<ip>/cm?cmnd=Power<relay>=<ON|OFF>`
-<<<<<<< HEAD
-- Status: `http://<ip>/cm?cmnd=Status`
-- Energy: `http://<ip>/cm?cmnd=status%208`
-=======
 - Status: `http://<ip>/cm?cmnd=status%208`
 - Status (abbreviated): `http://<ip>/cm?cmnd=status%201`
 
@@ -95,7 +91,6 @@ All four devices verified:
 - gx10 (192.168.88.10) - Eightree GX10
 
 No testing has been performed on other Tasmota device types (Sonoff, Shelly, etc.). Compatibility with other hardware may vary.
->>>>>>> 952fdfa0a8f7a7a2ece60de954bcce61ec14ad5e
 
 ## Requirements
 
