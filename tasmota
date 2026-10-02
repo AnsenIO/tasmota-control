@@ -131,16 +131,6 @@ def cmd_power(devices, name):
         print(f"{dev_name} does not report power data.", file=sys.stderr)
 
 
-def _wh_to_kwh(val):
-    """Convert Wh value to kWh string (3 decimal places)."""
-    if val is None or val == "N/A" or val == "":
-        return "N/A"
-    try:
-        return f"{float(val) / 1000:.3f}"
-    except (ValueError, TypeError):
-        return "N/A"
-
-
 def cmd_list(devices, verbose=False, quiet=False):
     """List all devices with live status and energy data."""
     if not devices:
@@ -162,9 +152,9 @@ def cmd_list(devices, verbose=False, quiet=False):
             live_data[dev_name] = {
                 "status": relay_state,
                 "power": energy.get("Power", "N/A"),
-                "today_kwh": _wh_to_kwh(energy.get("Today")),
-                "yesterday_kwh": _wh_to_kwh(energy.get("Yesterday")),
-                "total_kwh": _wh_to_kwh(energy.get("Total")),
+                "today": energy.get("Today", "N/A"),
+                "yesterday": energy.get("Yesterday", "N/A"),
+                "total": energy.get("Total", "N/A"),
                 "voltage": energy.get("Voltage", "N/A"),
                 "current": energy.get("Current", "N/A"),
                 "factor": energy.get("Factor", "N/A"),
@@ -196,7 +186,7 @@ def cmd_list(devices, verbose=False, quiet=False):
         print("-" * 116)
         for dev_name, info in devices.items():
             ld = live_data[dev_name]
-            print(f"{dev_name:<20} {info['ip']:<18} {ld['status']:<8} {ld['power']:<10} {ld['today_kwh']:<10} {ld['yesterday_kwh']:<10} {ld['total_kwh']:<10} {ld['voltage']:<10} {ld['current']:<10} {ld['factor']:<8}")
+            print(f"{dev_name:<20} {info['ip']:<18} {ld['status']:<8} {ld['power']:<10} {ld['today']:<10} {ld['yesterday']:<10} {ld['total']:<10} {ld['voltage']:<10} {ld['current']:<10} {ld['factor']:<8}")
     else:
         print(f"{'Name':<20} {'IP':<18} {'Status':<8} {'Power (W)':<12} {'Today (kWh)':<12} {'Total (kWh)':<12}")
         print("-" * 78)
