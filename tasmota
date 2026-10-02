@@ -3,7 +3,7 @@
 
 Usage:
     tasmota <device> on|off|toggle|status|power
-    tasmota list
+    tasmota list [--full|--quiet]
     tasmota discover
 
 Device mapping is loaded from config/devices.yaml.
@@ -15,7 +15,6 @@ import urllib.request
 import urllib.error
 import yaml
 import os
-import socket
 
 # Default config path
 DEFAULT_CONFIG = os.path.expanduser("~/.config/tasmota/devices.yaml")
@@ -143,7 +142,7 @@ def cmd_list(devices, verbose=False, quiet=False):
     for dev_name, dev_info in devices.items():
         ip = dev_info["ip"]
         try:
-            # Use status 0 to get everything in one call
+            # Use status 0 to get everything in one call (fixes relay state bug)
             result = http_get(ip, "/cm?cmnd=status%200")
             status_sts = result.get("StatusSTS", {})
             status_sns = result.get("StatusSNS", {})
@@ -208,7 +207,7 @@ def cmd_rename(devices, name, new_name):
         save_devices(devices)
         print(f"  Config updated: {dev_name} renamed to '{new_name}'")
     else:
-        # Device found by IP — rename the key
+        # Device found by IP - rename the key
         for key in list(devices.keys()):
             if devices[key].get("ip") == ip:
                 devices[new_name] = devices.pop(key)
@@ -231,7 +230,7 @@ def cmd_updateip(devices, name, new_ip):
         save_devices(devices)
         print(f"  Config updated: {dev_name} IP changed from {old_ip} to {new_ip}")
     else:
-        # Device found by name — update IP
+        # Device found by name - update IP
         devices[dev_name]["ip"] = new_ip
         save_devices(devices)
         print(f"  Config updated: {dev_name} IP changed from {old_ip} to {new_ip}")
