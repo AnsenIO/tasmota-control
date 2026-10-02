@@ -69,7 +69,7 @@ def cmd_on(devices, name):
     dev_name, dev = get_device(devices, name)
     relay = dev.get("relay", 1)
     ip = dev["ip"]
-    result = http_get(ip, f"/cm?cmnd=Power{relay}=ON")
+    result = http_get(ip, f"/cm?cmnd=power{relay}%20ON")
     print(f"{dev_name} -> ON: {result}")
 
 
@@ -78,7 +78,7 @@ def cmd_off(devices, name):
     dev_name, dev = get_device(devices, name)
     relay = dev.get("relay", 1)
     ip = dev["ip"]
-    result = http_get(ip, f"/cm?cmnd=Power{relay}=OFF")
+    result = http_get(ip, f"/cm?cmnd=power{relay}%20OFF")
     print(f"{dev_name} -> OFF: {result}")
 
 
@@ -87,11 +87,11 @@ def cmd_toggle(devices, name):
     dev_name, dev = get_device(devices, name)
     relay = dev.get("relay", 1)
     ip = dev["ip"]
-    # Get current status
-    status = http_get(ip, "/cm?cmnd=Status")
-    power = status.get("Status", {}).get("Power", "0")
-    new_state = "OFF" if power == "1" else "ON"
-    result = http_get(ip, f"/cm?cmnd=Power{relay}={new_state}")
+    # Get current status via status 0 (fixes relay state bug)
+    status = http_get(ip, "/cm?cmnd=status%200")
+    power = status.get("StatusSTS", {}).get("POWER", "0")
+    new_state = "OFF" if power == "ON" else "ON"
+    result = http_get(ip, f"/cm?cmnd=power{relay}%20{new_state}")
     print(f"{dev_name} -> {new_state}: {result}")
 
 
@@ -192,7 +192,7 @@ def cmd_list(devices, verbose=False, quiet=False):
         print("-" * 78)
         for dev_name, info in devices.items():
             ld = live_data[dev_name]
-            print(f"{dev_name:<20} {info['ip']:<18} {ld['status']:<8} {ld['power']:<12} {ld['today_kwh']:<12} {ld['total_kwh']:<12}")
+            print(f"{dev_name:<20} {info['ip']:<18} {ld['status']:<8} {ld['power']:<12} {ld['today']:<12} {ld['total']:<12}")
 
 
 def cmd_rename(devices, name, new_name):
